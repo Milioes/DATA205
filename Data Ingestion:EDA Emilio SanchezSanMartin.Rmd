@@ -1,0 +1,199 @@
+---
+title: "Data Ingestion/EDA"
+author: "Emilio Sanchez San Martin"
+date: "2025-04-06"
+output:
+  pdf_document: default
+  html_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Continuing Data Investigation
+
+First, I have to get every library that I will use for this Data
+Investigation/EDA.
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+```
+
+I have to put the three datasets now on my global envrionment to work
+with them.
+
+```{r}
+# Loading the datasets
+High_Volume_Weekly_DS <- read.csv("/Users/emilio/Downloads/Montgomery-College-Data-Set-1(High-Volume-Weekly)-csv.csv")
+Medium_Volume_Weekly_DS <- read.csv("/Users/emilio/Downloads/Montgomery-College-Data-Set-1(Medium-Volume-Weekly)-csv.csv")
+Low_Volume_Weekly_DS <- read.csv("/Users/emilio/Downloads/Montgomery-College-Data-Set-1(Low-Volume-Weekly)-csv.csv")
+
+```
+
+I noticed that the variables on the top of my data set have X1, X2, X3,
+etc. I will remove the X and replace it with "Week".
+
+```{r}
+# Renaming the columns
+colnames(High_Volume_Weekly_DS) <- gsub("X", "Week", colnames(High_Volume_Weekly_DS))
+colnames(Medium_Volume_Weekly_DS) <- gsub("X", "Week", colnames(Medium_Volume_Weekly_DS))
+colnames(Low_Volume_Weekly_DS) <- gsub("X", "Week", colnames(Low_Volume_Weekly_DS))
+```
+
+Finally, I will do my last step with this data set, which is to multiply
+to "Bottles_Per_Case" varibale with "Cost_Amount_Per_Bottle" variable to
+get the "Total_Cost" variable for all the bottles in a case. I will do
+this for all three data sets.
+
+```{r}
+# Creating the Total_Cost variable
+High_Volume_Weekly_DS <- High_Volume_Weekly_DS |>
+  mutate(Total_Cost = Bottles_Per_Case * Cost_Amount_Per_Bottle)
+
+Medium_Volume_Weekly_DS <- Medium_Volume_Weekly_DS |>
+  mutate(Total_Cost = Bottles_Per_Case * Cost_Amount_Per_Bottle)
+
+Low_Volume_Weekly_DS <- Low_Volume_Weekly_DS |>
+  mutate(Total_Cost = Bottles_Per_Case * Cost_Amount_Per_Bottle)
+
+```
+
+I want to move the last column "Total_Cost" right after the
+"Cost_Amount_Per_Bottle" column. I will do this for all three data sets.
+
+```{r}
+# Moving the Total_Cost column
+High_Volume_Weekly_DS <- High_Volume_Weekly_DS |>
+  select(ItemID, Description, Bottles_Per_Case, Cost_Amount_Per_Bottle, Total_Cost, everything())
+Medium_Volume_Weekly_DS <- Medium_Volume_Weekly_DS |>
+  select(ItemID, Description, Bottles_Per_Case, Cost_Amount_Per_Bottle, Total_Cost, everything())
+Low_Volume_Weekly_DS <- Low_Volume_Weekly_DS |>
+  select(ItemID, Description, Bottles_Per_Case, Cost_Amount_Per_Bottle, Total_Cost, everything())
+
+```
+
+Finished! I will do my last step, which is to check the structure of the
+data sets to see if everything is in order. I will do this by using the
+str() function.
+
+```{r}
+# Checking the structure of the datasets
+str(High_Volume_Weekly_DS)
+str(Medium_Volume_Weekly_DS)
+str(Low_Volume_Weekly_DS)
+
+```
+
+Time to export the data sets to CSV files so I can use them in my
+analysis.
+
+```{r}
+# Exporting the datasets to CSV files
+write.csv(High_Volume_Weekly_DS, "/Users/emilio/Downloads/High_Volume_Weekly_DS.csv", row.names = FALSE)
+write.csv(Medium_Volume_Weekly_DS, "/Users/emilio/Downloads/Medium_Volume_Weekly_DS.csv", row.names = FALSE)
+write.csv(Low_Volume_Weekly_DS, "/Users/emilio/Downloads/Low_Volume_Weekly_DS.csv", row.names = FALSE)
+
+```
+
+## Now time to work on the EDA!
+
+My next goal for this project is to discover patterns with the data, and
+what I can find to help others know to understand. Particullarly, if I
+were able to find Moving Average Sales trends from any product or
+products, especially a top selling product, I can understand the basis
+of how my algorithm could work. My first goal will try to uncover...
+
+##### - Moving Average Salaes Trends for a Top-Selling Product
+
+Working with Weekly data especially will help look at trends better.
+
+I will choose the most sold amount of products across all stores, for
+ALL of 2024.
+
+Since we have the "Grand_Total" Variable, all I have to do is look at
+the highest grand total for all the products and see which is the
+highst.
+
+```{r}
+# Finding the top-selling product for 2024
+top_selling_product_high_vol_store <- High_Volume_Weekly_DS |>
+  arrange(desc(Grand_Total)) |>
+  slice(1)
+
+top_selling_product_medium_vol_store <- Medium_Volume_Weekly_DS |>
+  arrange(desc(Grand_Total)) |>
+  slice(1)
+
+top_selling_product_low_vol_store <- Low_Volume_Weekly_DS |>
+  arrange(desc(Grand_Total)) |>
+  slice(1)
+
+top_selling_product_high_vol_store
+top_selling_product_medium_vol_store
+top_selling_product_low_vol_store
+```
+
+As we see above, the top selling product for the.. High Volume store =
+"SCOTTY'S VODKA 50ML" Medium Volume store = "FIREBALL CINN WHISKEY
+50ML/10PK LOOSE" Low Volume store = "FIREBALL CINN WHISKEY 50ML/10PK
+LOOSE".
+
+Now for curiosity, I want to use the moving average across a set of
+weeks to see if I can find trends. I will have to use the zoo package
+for this.
+
+```{r}
+library(zoo) #Used Google to help understnad how to use this package
+
+```
+
+```{r}
+# Sales for 53 weeks in a vector
+weekly_sales_high <- as.numeric(High_Volume_Weekly_DS[1, paste0("Week", 1:53)])
+weekly_sales_medium <- as.numeric(Medium_Volume_Weekly_DS[1, paste0("Week", 1:53)])
+weekly_sales_low <- as.numeric(Low_Volume_Weekly_DS[1, paste0("Week", 1:53)])
+
+# Will use a 4-week moving average
+moving_avg_high <- rollmean(weekly_sales_high, k = 4, fill = NA, align = "right")
+moving_avg_medium <- rollmean(weekly_sales_medium, k = 4, fill = NA, align = "right")
+moving_avg_low <- rollmean(weekly_sales_low, k = 4, fill = NA, align = "right")
+
+# Below I will put approximate starting week for each month to show when the months start
+month_weeks <- c(1, 5, 9, 14, 18, 22, 27, 31, 36, 40, 45, 49)
+month_labels <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+plot(moving_avg_high, type = "l", col = "darkblue", lwd = 2,
+     xaxt = "n",  # Turning off x-axis to show months
+     main = "4-Week Moving Average - High Volume Store",
+     ylab = "Sales", xlab = "Week",
+     cex.main = 1.2, cex.lab = 1.1, cex.axis = 0.9)
+axis(1, at = month_weeks, labels = month_labels)
+grid()
+
+plot(moving_avg_medium, type = "l", col = "darkgreen", lwd = 2,
+     xaxt = "n",  # Turning off x-axis to show months
+     main = "4-Week Moving Average - Medium Volume Store",
+     ylab = "Sales", xlab = "Week",
+     cex.main = 1.2, cex.lab = 1.1, cex.axis = 0.9)
+axis(1, at = month_weeks, labels = month_labels)
+grid()
+
+plot(moving_avg_low, type = "l", col = "darkred", lwd = 2,
+     xaxt = "n",  # Turning off x-axis to show months
+     main = "4-Week Moving Average - Low Volume Store",
+     ylab = "Sales", xlab = "Week",
+     cex.main = 1.2, cex.lab = 1.1, cex.axis = 0.9)
+axis(1, at = month_weeks, labels = month_labels)
+grid()
+```
+
+Oh wow.. as you can see from the above, the 4-week Moving Averages for
+differen volume of stores for the HIGHEST selling product all year long
+has been different for different weeks. Towards the end of the year, the
+sales for the high volume store have been increasing, while the sales
+for the medium and low volume stores have been decreasing in the middle
+of the weeks (as you can see... around July and August). This is very
+interesting to see. I will have to look at this more closely later on.
