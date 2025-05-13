@@ -1,3 +1,9 @@
 # DATA205
-This is a demonstration repo for DATA205.
 This is my capstone project for DATA205 Spring 2025 at Montgomery College.
+
+Montgomery County's Alcohol and Beverage Services (ABS) Retail Division has been operating several stores in the county, which had a balance of different tradeoffs of overstocking and stockouts for their alcohol products. Excess inventory leads to the county's tied-up funds and could lead to waste, while understocking may result in missed sales that would leave customers unable to purchase products they wish for. ABS currently uses its own Master Planning Algorithm system to help calculate inventory thresholds such as the Minimum Shelf Stock (MSS) and the Reorder Amount in bottles for each product sold in store. These values help ABS place orders and ensure stores have well-stocked products for people to purchase.
+
+The algorithm ABS uses considers different factors, such as the daily sales across a three-time-period window, and takes minimum thresholds. Their system, however, lacks other dynamics that are as important, like delivery lead times, delivery frequency, and on-sale item states that can be a limitation, considering their impact on inventory. The ABS IT team wants to explore if their algorithm could be refined or redesigned to reflect operational realities better and improve their efficiency across stores with many different volumes and footprints.
+
+My goal is to develop a smarter, responsive inventory algorithm that better balances product availability with inventory efficiency. I compared their existing ABS algorithm logic with another customized alternative that they could consider, evaluating the effect on performance and how they could look at different stores from high-volume, mid-volume, and low-volume stores. The goal is to reduce excess inventory and keep track of missed sales by producing a productive model that could serve the ABS team, helping them calculate MSS and reorder quantities for this. This is important to avoid waste due to overstocking, prevent loss of revenue from stockouts, and adapt more closely to store factors.
+
