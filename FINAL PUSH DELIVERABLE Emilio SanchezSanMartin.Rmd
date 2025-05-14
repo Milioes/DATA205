@@ -1,0 +1,2037 @@
+---
+title: "Data Ingestion/EDA"
+author: "Emilio Sanchez San Martin"
+date: "2025-04-06"
+output:
+  html_document: default
+  pdf_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+## Continuing Data Investigation
+
+First, I have to get every library that I will use for this Data
+Investigation/EDA.
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+library(zoo)
+library(stringr)
+
+```
+
+I have to put the three datasets now on my global envrionment to work
+with them.
+
+```{r}
+# Loading the datasets
+High_Volume_Weekly_DS <- read.csv("/Users/emilio/Downloads/DATA 205/Montgomery-College-Data-Set-1(High-Volume-Weekly)-csv.csv")
+Medium_Volume_Weekly_DS <- read.csv("/Users/emilio/Downloads/DATA 205/Montgomery-College-Data-Set-1(Medium-Volume-Weekly)-csv.csv")
+Low_Volume_Weekly_DS <- read.csv("/Users/emilio/Downloads/DATA 205/Montgomery-College-Data-Set-1(Low-Volume-Weekly)-csv.csv")
+
+```
+
+I noticed that the variables on the top of my data set have X1, X2, X3,
+etc. I will remove the X and replace it with "Week".
+
+```{r}
+# Renaming the columns
+colnames(High_Volume_Weekly_DS) <- gsub("X", "Week", colnames(High_Volume_Weekly_DS))
+colnames(Medium_Volume_Weekly_DS) <- gsub("X", "Week", colnames(Medium_Volume_Weekly_DS))
+colnames(Low_Volume_Weekly_DS) <- gsub("X", "Week", colnames(Low_Volume_Weekly_DS))
+```
+
+Finally, I will do my last step with this data set, which is to multiply
+to "Bottles_Per_Case" varibale with "Cost_Amount_Per_Bottle" variable to
+get the "Total_Cost" variable for all the bottles in a case. I will do
+this for all three data sets.
+
+```{r}
+# Creating the Total_Cost variable
+High_Volume_Weekly_DS <- High_Volume_Weekly_DS |>
+  mutate(Total_Cost = Bottles_Per_Case * Cost_Amount_Per_Bottle)
+
+Medium_Volume_Weekly_DS <- Medium_Volume_Weekly_DS |>
+  mutate(Total_Cost = Bottles_Per_Case * Cost_Amount_Per_Bottle)
+
+Low_Volume_Weekly_DS <- Low_Volume_Weekly_DS |>
+  mutate(Total_Cost = Bottles_Per_Case * Cost_Amount_Per_Bottle)
+
+```
+
+I want to move the last column "Total_Cost" right after the
+"Cost_Amount_Per_Bottle" column. I will do this for all three data sets.
+
+```{r}
+# Moving the Total_Cost column
+High_Volume_Weekly_DS <- High_Volume_Weekly_DS |>
+  select(ItemID, Description, Bottles_Per_Case, Cost_Amount_Per_Bottle, Total_Cost, everything())
+Medium_Volume_Weekly_DS <- Medium_Volume_Weekly_DS |>
+  select(ItemID, Description, Bottles_Per_Case, Cost_Amount_Per_Bottle, Total_Cost, everything())
+Low_Volume_Weekly_DS <- Low_Volume_Weekly_DS |>
+  select(ItemID, Description, Bottles_Per_Case, Cost_Amount_Per_Bottle, Total_Cost, everything())
+
+```
+
+Finished! I will do my last step, which is to check the structure of the
+data sets to see if everything is in order. I will do this by using the
+str() function.
+
+```{r}
+# Checking the structure of the datasets
+str(High_Volume_Weekly_DS)
+str(Medium_Volume_Weekly_DS)
+str(Low_Volume_Weekly_DS)
+
+```
+
+Time to export the data sets to CSV files so I can use them in my
+analysis.
+
+```{r}
+# Exporting the datasets to CSV files
+write.csv(High_Volume_Weekly_DS, "/Users/emilio/Downloads/High_Volume_Weekly_DS.csv", row.names = FALSE)
+write.csv(Medium_Volume_Weekly_DS, "/Users/emilio/Downloads/Medium_Volume_Weekly_DS.csv", row.names = FALSE)
+write.csv(Low_Volume_Weekly_DS, "/Users/emilio/Downloads/Low_Volume_Weekly_DS.csv", row.names = FALSE)
+
+```
+
+## Now time to work on the EDA!
+
+My next goal for this project is to discover patterns with the data, and
+what I can find to help others know to understand. Particullarly, if I
+were able to find Moving Average Sales trends from any product or
+products, especially a top selling product, I can understand the basis
+of how my algorithm could work. My first goal will try to uncover...
+
+##### - Moving Average Salaes Trends for a Top-Selling Product
+
+Working with Weekly data especially will help look at trends better.
+
+I will choose the most sold amount of products across all stores, for
+ALL of 2024.
+
+Since we have the "Grand_Total" Variable, all I have to do is look at
+the highest grand total for all the products and see which is the
+highst.
+
+```{r}
+# Finding the top-selling product for 2024
+top_selling_product_high_vol_store <- High_Volume_Weekly_DS |>
+  arrange(desc(Grand_Total)) |>
+  slice(1)
+
+top_selling_product_medium_vol_store <- Medium_Volume_Weekly_DS |>
+  arrange(desc(Grand_Total)) |>
+  slice(1)
+
+top_selling_product_low_vol_store <- Low_Volume_Weekly_DS |>
+  arrange(desc(Grand_Total)) |>
+  slice(1)
+
+top_selling_product_high_vol_store
+top_selling_product_medium_vol_store
+top_selling_product_low_vol_store
+```
+
+As we see above, the top selling product for the.. High Volume store =
+"SCOTTY'S VODKA 50ML" Medium Volume store = "FIREBALL CINN WHISKEY
+50ML/10PK LOOSE" Low Volume store = "FIREBALL CINN WHISKEY 50ML/10PK
+LOOSE".
+
+Now for curiosity, I want to use the moving average across a set of
+weeks to see if I can find trends. I will have to use the zoo package
+for this.
+
+WIll use library zoo for this
+
+```{r}
+# Sales for 53 weeks in a vector
+weekly_sales_high <- as.numeric(High_Volume_Weekly_DS[1, paste0("Week", 1:53)])
+weekly_sales_medium <- as.numeric(Medium_Volume_Weekly_DS[1, paste0("Week", 1:53)])
+weekly_sales_low <- as.numeric(Low_Volume_Weekly_DS[1, paste0("Week", 1:53)])
+
+# Will use a 4-week moving average
+moving_avg_high <- rollmean(weekly_sales_high, k = 3, fill = NA, align = "right")
+moving_avg_medium <- rollmean(weekly_sales_medium, k = 3, fill = NA, align = "right")
+moving_avg_low <- rollmean(weekly_sales_low, k = 3, fill = NA, align = "right")
+
+# Below I will put approximate starting week for each month to show when the months start
+month_weeks <- c(1, 5, 9, 14, 18, 22, 27, 31, 36, 40, 45, 49)
+month_labels <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+# Creating a data frame for plotting
+moving_avg_df_high <- data.frame(
+  Week = 1:53,
+  Sales = moving_avg_high,
+  Store = "High Volume"
+)
+
+moving_avg_df_medium <- data.frame(
+  Week = 1:53,
+  Sales = moving_avg_medium,
+  Store = "Medium Volume"
+)
+
+moving_avg_df_low <- data.frame(
+  Week = 1:53,
+  Sales = moving_avg_low,
+  Store = "Low Volume"
+)
+
+# Combining all data frames
+moving_avg_df <- bind_rows(moving_avg_df_high, moving_avg_df_medium, moving_avg_df_low)
+
+ggplot(moving_avg_df, aes(x = Week, y = Sales, color = Store)) +
+  geom_line(size = 1.2, na.rm = TRUE) +
+  scale_x_continuous(breaks = month_weeks, labels = month_labels) +
+  scale_color_manual(values = c("High Volume" = "darkblue",
+                                "Medium Volume" = "darkgreen",
+                                "Low Volume" = "darkred")) +
+  labs(
+    title = "3-Week Moving Average of Sales by Store Type \n - HIGHEST sold product $$$ (2024)",
+    x = "Month",
+    y = "Sales",
+    color = "Store"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "top"
+  )
+```
+
+Oh wow.. as you can see from the above, the 4-week Moving Averages for
+different volume of stores for the HIGHEST selling product all year long
+has been different for different weeks. Towards the end of the year, the
+sales for the high volume store have been increasing, while the sales
+for the medium and low volume stores have been decreasing in the middle
+of the weeks (as you can see... around July and August). This is very
+interesting to see. I will have to look at this more closely later on.
+
+```{r}
+#Me playing around with making the algorithm.
+
+# Example weekly sales for the highest product (SCOTTY'S VODKA 50ML) as an example
+## period1 <- c(60, 93, 93, 94, 89)
+## period2 <- c(114, 145, 94, 63, 130)
+## period3 <- c(90, 95, 100, 98, 97)
+
+# Calculating average sales for each period
+## avg1 <- mean(period1)
+## avg2 <- mean(period2)
+## avg3 <- mean(period3)
+
+```
+
+WEIGHTED AVERAGES: for later use: (Skip this step)
+
+```{r}
+# Apply weights: P1 = 15%, P2 = 25%, P3 = 60%
+## weighted_avg <- (0.15 * avg1) + (0.25 * avg2) + (0.60 * avg3)
+## weighted_avg
+
+```
+
+```{r}
+
+# Step 2: Combined average (no weights)
+##  combined_avg <- mean(c(avg1, avg2, avg3))
+  
+# Step 3: Standard deviation of averages
+##  stdev_val <- sd(c(avg1, avg2, avg3))
+  
+# Step 4: Check if Period 1 is consistent
+##  if (abs(avg1 - combined_avg) > (3 * stdev_val)) {
+##    chosen_avg <- combined_avg
+##  } else {
+##    chosen_avg <- avg1
+##  }
+  
+# Step 5: Convert to daily average
+##  daily_avg <- chosen_avg / 7
+
+# Step 6: Constants (can customize later)
+##  reorder_threshold_days <- 10
+##  lead_time_days <- 10
+  
+##  MSS <- daily_avg * reorder_threshold_days
+##  reorder_qty <- (daily_avg * lead_time_days) + MSS
+
+```
+
+Okay simple. I split the first 3 periods (Each period if 5 weeks) from
+the first 15 weeks of the dataset (the start of january) and I
+calculated the average for each. Then I put calculated using weighted
+average.
+
+```{r}
+
+## EXAMPLE OF REORDER QTY CALCULATION
+
+
+## reorder_threshold_days <- 10 # The number of days of sales you want to always have in stock before ordering more. # "If I have 10 days of this alcohol in stock, I will need to re-order more!"
+## lead_time_days <- 10
+
+# Minimum Shelf Stock
+## MSS <- (weighted_avg/7) * reorder_threshold_days #The lowest amount of product the ABS stores should keep on hand at all times to stay stocked and ready.
+# MSS = (Average daily sales) × (Reorder Threshold)
+# Exp: I need atleast # alcohol stores at all times. That’s the backup stash, just in case demand suddenly goes up.
+
+#NOTE: Lead time is 10 days, so I will need to order more alcohol 10 days before I run out of stock.
+
+
+# Reorder Quantity
+## reorder_qty <- (weighted_avg * lead_time_days) + MSS
+# Reorder Quantity = (Average daily sales) × (Lead time) + MSS
+
+## reorder_qty
+```
+
+Cool! The reorder_qty is 1995.4. That means that I will need to order
+1117.371 bottles of SCOTTY'S VODKA 50ML every time you reorder (which is
+every 10 days — the lead time).
+
+In the future, I wil try to implement this algorithm to the rest of the
+products in the data set. I will also try to implement this algorithm to
+the other two data sets (Medium and Low Volume stores) to see if I can
+find any patterns or trends, and make possible visualizations with this.
+For now, I will keep how everything is.
+
+# Labeling products with a category: Beer and Other
+
+I have to ensure that products that have a reorder tres hold of 14 days
+(beer) are calcualted correctly in the algorithm. I will do this by
+creating a new column called "Category" and putting the category of the
+product in there.
+
+```{r}
+# First, I want to see which beer brands there are. I am going to start of with a basic search for different beer products.
+
+beer_brands <- c("CORONA","STELLA", "HEINEKEN", "MODELO","BLUE MOON", "GUINNESS", "SAPPORO", "MICHELOB", "SAM ADAMS", "NEGRA MODELO", "PERONI", "PILSNER URQUELL", "FLYING DOG", "LEFFE", "ASAHI", "DC BRAU", "DOS EQUIS", "SIERRA NEVADA", "TSINGTAO", "RED STRIPE", "ALLAGASH", "DENIZENS", "SINGHA", "BEER FARM", "DOGFISH HEAD SLIGHTLY MIGHTY LO-CAL IPA 4/6PK", "DOGFISH HEAD SEAQUENCH ALE 4/6 CAN", "DOGFISH HEAD PUNKIN ALE 4/6 CAN", "DOGFISH HEAD IPA 2/12 VP CANS", "DOGFISH HEAD HAZY SQUALL 4/6 CAN", "DOGFISH HEAD FESTINA PECHE 4/6 CN", "DOGFISH HEAD 90 MINUTE IMPERIAL IPA 4/6 NR", "DOGFISH HEAD 60 MIN IPA 4/6 NR - 12OZ", "DOGFISH HEAD (SUMMER) VP 2/12PK CAN", "DOGFISH HEAD (FALL) VP 2/12", "NEW BELGIUM")
+
+High_Volume_Weekly_DS$Category <- ifelse(grepl(paste(beer_brands, collapse = "|"), High_Volume_Weekly_DS$Description, ignore.case = TRUE), "Beer", "Other")
+Medium_Volume_Weekly_DS$Category <- ifelse(grepl(paste(beer_brands, collapse = "|"), Medium_Volume_Weekly_DS$Description, ignore.case = TRUE), "Beer", "Other")
+Low_Volume_Weekly_DS$Category <- ifelse(grepl(paste(beer_brands, collapse = "|"), Low_Volume_Weekly_DS$Description, ignore.case = TRUE), "Beer", "Other")
+
+```
+
+```{r}
+# Making a copy of the original datasets (for my function I will create)
+High_Volume_Weekly_DS_copy <- High_Volume_Weekly_DS
+Medium_Volume_Weekly_DS_copy <- Medium_Volume_Weekly_DS
+Low_Volume_Weekly_DS_copy <- Low_Volume_Weekly_DS
+```
+
+```{r}
+# Making a copy of the original datasets (for Weighted averages just to test that alone)
+High_Volume_Weekly_DS_weighted_averages <- High_Volume_Weekly_DS
+Medium_Volume_Weekly_DS_weighted_averages <- Medium_Volume_Weekly_DS
+Low_Volume_Weekly_DS_weighted_averages <- Low_Volume_Weekly_DS
+```
+
+# Below I will try to implement the algorithm to the data set to see if I can get Reorder_Qty for all the products in the data set.
+
+## I WILL only test to see if it works here, I will not run this code on my final output since I will make an algorothm that works for all periods of the week and make more columns (Getting reorder quantities starting rfrom week 16 to 53)
+
+```{r}
+# Function to calculate reorder quantity
+
+## calculate_reorder_simple <- function(row) {
+  
+  # Step 1: Get period averages
+##  period1 <- as.numeric(row[paste0("Week", 1:5)])
+##  period2 <- as.numeric(row[paste0("Week", 6:10)])
+##  period3 <- as.numeric(row[paste0("Week", 11:15)])
+  
+##  total_sales <- sum(period1) + sum(period2) + sum(period3)
+
+##  if (total_sales < as.numeric(row["Bottles_Per_Case"])) {
+##    return(0)  # If less than a case sold over 15 weeks, don't reorder
+##  }
+  
+##  avg1 <- mean(period1)
+##  avg2 <- mean(period2)
+##  avg3 <- mean(period3)
+  
+  # Step 2: Combined average (no weights)
+##  combined_avg <- mean(c(avg1, avg2, avg3))
+  
+  # Step 3: Absolute difference between avg1 and combined_avg
+##  stdev_val <- abs(avg1 - combined_avg)
+
+  # Step 4: Check if Period 1 is consistent
+##  if (stdev_val > 3) {
+#    chosen_avg <- combined_avg
+##  } else {
+##    chosen_avg <- avg1
+##  }
+  
+  # Step 5: Convert to daily average
+##  daily_avg <- chosen_avg / 7
+  
+  # Step 6: Constants (customized based on Beer or Other)
+##  reorder_threshold_days <- 10
+##  if (row["Category"] == "Beer") {
+##    reorder_threshold_days <- 14
+##  }
+  
+##  lead_time_days <- 10
+  
+##  MSS <- daily_avg * reorder_threshold_days
+##  reorder_qty <- (daily_avg * lead_time_days) + MSS
+  
+##  return(round(reorder_qty, 2))
+##}
+
+
+```
+
+## Apply the function to each row of the dataset
+
+```{r}
+## High_Volume_Weekly_DS$Reorder_Qty <- apply(High_Volume_Weekly_DS, 1, calculate_reorder_simple)
+## Medium_Volume_Weekly_DS$Reorder_Qty <- apply(Medium_Volume_Weekly_DS, 1, calculate_reorder_simple)
+## Low_Volume_Weekly_DS$Reorder_Qty <- apply(Low_Volume_Weekly_DS, 1, calculate_reorder_simple)
+```
+
+# Below is calculation to ROUND to the NEAREST Case! (Bottles_Per_Case) (VERY IMPORTANT, Will have to use for later)
+
+```{r}
+# High_Volume_Weekly_DS$Reorder_Cases <- ceiling(High_Volume_Weekly_DS$Reorder_Qty / as.numeric(High_Volume_Weekly_DS$Bottles_Per_Case))
+
+# Medium_Volume_Weekly_DS$Reorder_Cases <- ceiling(Medium_Volume_Weekly_DS$Reorder_Qty / as.numeric(Medium_Volume_Weekly_DS$Bottles_Per_Case))
+
+# Low_Volume_Weekly_DS$Reorder_Cases <- ceiling(Low_Volume_Weekly_DS$Reorder_Qty / as.numeric(Low_Volume_Weekly_DS$Bottles_Per_Case))
+
+```
+
+We got the originial algorithm to work!!! So happy about this, now that
+it works, we can calculate the exact number of bottles AND MOST
+IMPORTANTLY as well the number of cases needed to be order of that
+product usng the algorithm and knowig how much we would keep in stock.
+NOW i want to try to recreate the algorithm and continue on the Master
+Planning.
+
+## Master Planning
+
+I will recalculate reorder quantities using a new set of 3 five-week
+periods, say every month or quarter.
+
+First plan was 1 - 15 weeks Next plan: 2 - 16 weeks And so on (till I
+reach 53).
+
+I will plan by batch of 3 periods (15 weeks) and then I will move the
+window by 3 periods (15 weeks) to get the next batch of 3 periods. I
+will do this for all the products in the data set (since ABS plans by
+month)
+
+# Functions
+
+# ---------
+
+# Working for the first 3 periods (15 weeks) and then moving the window by 3 periods (15 weeks) to get the next batch of 3 periods.
+
+```{r}
+# Modified function: Now returns the Reorder quantities of bottles
+calculate_reorder_sliding <- function(row, start_week) {
+  
+  # Define the week ranges based on start_week
+  weeks <- paste0("Week", start_week:(start_week + 14))  # 15 weeks
+  week_nums <- start_week:(start_week + 14)
+  
+  # Make 3 periods of 5 weeks each
+  period1 <- as.numeric(row[paste0("Week", week_nums[1:5])])
+  period2 <- as.numeric(row[paste0("Week", week_nums[6:10])])
+  period3 <- as.numeric(row[paste0("Week", week_nums[11:15])])
+  
+  total_sales <- sum(period1) + sum(period2) + sum(period3)
+  
+  if (total_sales < as.numeric(row["Bottles_Per_Case"])) {
+    return(0)  # If less than a case sold, don't reorder
+  }
+  
+  avg1 <- mean(period1)
+  avg2 <- mean(period2)
+  avg3 <- mean(period3)
+  
+  combined_avg <- mean(c(avg1, avg2, avg3))
+  stdev_val <- abs(avg1 - combined_avg)
+  
+  chosen_avg <- if (stdev_val > 3) combined_avg else avg1
+  
+  daily_avg <- chosen_avg / 7
+  
+  reorder_threshold_days <- if (row["Category"] == "Beer") 14 else 10
+  lead_time_days <- 10
+  
+  MSS <- daily_avg * reorder_threshold_days
+  reorder_qty <- (daily_avg * lead_time_days) + MSS
+  
+  return(round(reorder_qty, 2))
+}
+```
+
+I will make ANOTHER function to also return only MSS values per sliding
+window.
+
+```{r}
+# New function: ONLY returns the MSS
+calculate_mss_sliding <- function(row, start_week) {
+  
+  # Define the week ranges based on start_week
+  week_nums <- start_week:(start_week + 14)
+  
+  # Create 3 periods of 5 weeks each
+  period1 <- as.numeric(row[paste0("Week", week_nums[1:5])])
+  period2 <- as.numeric(row[paste0("Week", week_nums[6:10])])
+  period3 <- as.numeric(row[paste0("Week", week_nums[11:15])])
+  
+  total_sales <- sum(period1) + sum(period2) + sum(period3)
+  
+  if (total_sales < as.numeric(row["Bottles_Per_Case"])) {
+    return(0)  # If less than a case sold, MSS is zero
+  }
+  
+  avg1 <- mean(period1)
+  avg2 <- mean(period2)
+  avg3 <- mean(period3)
+  
+  combined_avg <- mean(c(avg1, avg2, avg3))
+  stdev_val <- abs(avg1 - combined_avg)
+  
+  chosen_avg <- if (stdev_val > 3) combined_avg else avg1
+  
+  daily_avg <- chosen_avg / 7
+  
+  reorder_threshold_days <- if (row["Category"] == "Beer") 14 else 10
+  
+  MSS <- daily_avg * reorder_threshold_days
+  
+  return(round(MSS, 2))
+}
+```
+
+\`
+
+And lastly, I will create one more function to get Reorder Cases for
+each sliding window.
+
+```{r}
+# Function to calculate reorder cases
+convert_reorder_to_cases <- function(dataset) {
+  for (start_week in 1:39) {
+    reorder_col <- paste0("Reorder_Weeks_", start_week, "_", start_week + 14)
+    case_col <- paste0("Reorder_Cases_Weeks_", start_week, "_", start_week + 14)
+    
+    dataset[[case_col]] <- ceiling(dataset[[reorder_col]] / as.numeric(dataset$Bottles_Per_Case))
+  }
+  return(dataset)
+}
+
+```
+
+# Applying Functions
+
+# ------------------
+
+Now, I will Loop Through Weeks 1 to 39
+
+Because I need 15 weeks, the last valid starting week is Week 39 (39 +
+14 = 53).
+
+Here’s the code to...
+
+## Add a new Reorder column for each sliding window:
+
+```{r}
+# Create reorder columns for sliding windows
+for (start_week in 1:39) {  
+  reorder_col_name <- paste0("Reorder_Weeks_", start_week, "_", start_week + 14)
+  
+  High_Volume_Weekly_DS[[reorder_col_name]] <- apply(High_Volume_Weekly_DS, 1, function(row) {
+    calculate_reorder_sliding(row, start_week)
+  })
+  Medium_Volume_Weekly_DS[[reorder_col_name]] <- apply(Medium_Volume_Weekly_DS, 1, function(row) {
+    calculate_reorder_sliding(row, start_week)
+  })
+  Low_Volume_Weekly_DS[[reorder_col_name]] <- apply(Low_Volume_Weekly_DS, 1, function(row) {
+    calculate_reorder_sliding(row, start_week)
+  })
+}
+
+```
+
+## Getting the MSS
+
+```{r}
+# Create MSS columns for sliding windows
+for (start_week in 1:39) {  
+  mss_col_name <- paste0("MSS_Weeks_", start_week, "_", start_week + 14)
+  
+  High_Volume_Weekly_DS[[mss_col_name]] <- apply(High_Volume_Weekly_DS, 1, function(row) {
+    calculate_mss_sliding(row, start_week)
+  })
+  
+  Medium_Volume_Weekly_DS[[mss_col_name]] <- apply(Medium_Volume_Weekly_DS, 1, function(row) {
+    calculate_mss_sliding(row, start_week)
+  })
+  
+  Low_Volume_Weekly_DS[[mss_col_name]] <- apply(Low_Volume_Weekly_DS, 1, function(row) {
+    calculate_mss_sliding(row, start_week)
+  })
+}
+```
+
+## Convert Reorder quantities to Cases
+
+```{r}
+# Applying the conversion to each store type
+High_Volume_Weekly_DS <- convert_reorder_to_cases(High_Volume_Weekly_DS)
+Medium_Volume_Weekly_DS <- convert_reorder_to_cases(Medium_Volume_Weekly_DS)
+Low_Volume_Weekly_DS <- convert_reorder_to_cases(Low_Volume_Weekly_DS)
+
+```
+
+Now the orginial algorithm is calcualted with all it's sliding windows.
+I will try to visualize this below
+
+#Visualization
+
+```{r}
+
+# Step 1: Filter the item
+## VISUAL EXAMPLE OF MAKING A item_data table for visualization
+## item_data <- "dataset" %>% filter(ItemID == "ID") # <-- WHERE ITEM ID I enter!
+
+
+item_data <- High_Volume_Weekly_DS %>% filter(ItemID == "18467") # <-- WHICH ITEM ID I enter AND DATA SET!
+
+# Step 2: Get the reorder data (Weeks 16–53)
+reorder_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Qty"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Qty)
+
+# Step 3: Get the MSS data
+mss_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("MSS_Weeks_"),
+    names_to = "Window",
+    values_to = "MSS"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=MSS_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, MSS)
+
+# Step 4: Get weekly sales from Week16 to Week53
+sales_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Week"),
+    names_to = "Week",
+    values_to = "Sales"
+  ) %>%
+  mutate(Week_Num = as.numeric(str_remove(Week, "Week"))) %>%
+  filter(Week_Num >= 16, Week_Num <= 53) %>%
+  select(Week_Num, Sales) %>%
+  rename(Reorder_Week = Week_Num)
+
+# Step 5: Get the Reorder in Cases data
+reorder_cases_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Cases_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Cases"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Cases_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Cases)
+
+# Step 6: Combine all three
+combined_plot_data_abs <- sales_long %>%
+  left_join(reorder_long, by = "Reorder_Week") %>%
+  left_join(mss_long, by = "Reorder_Week") %>%
+  left_join(reorder_cases_long, by = "Reorder_Week") %>%
+  pivot_longer(cols = c("Sales", "Reorder_Qty", "MSS", "Reorder_Cases"),
+               names_to = "Metric", values_to = "Value")
+
+# Step 7: Plot
+algorithm_vis <- ggplot(combined_plot_data_abs, aes(x = Reorder_Week, y = Value, color = Metric)) +
+  geom_line(size = 1) +
+  geom_point() +
+  labs(
+    title = "Sales vs Reorder Quantity vs MSS (Weeks 16–53)",
+    x = "Week Number",
+    y = "Units",
+    subtitle = "Item: DISARONNO AMARETTO - 750ML (ItemID 42838)" # <-- NAME of Item!
+  ) +
+  scale_color_manual(values = c(
+    "Sales" = "black", 
+    "Reorder_Qty" = "blue", 
+    "MSS" = "red",
+    "Reorder_Cases" = "purple")) +
+  theme_minimal()
+
+ggplotly(algorithm_vis, tooltip = c("Reorder_Week", "Metric", "Value")) %>%
+  layout(
+    title = list(text = "Sales vs Reorder Quantity vs MSS (Weeks 16–53)"),
+    xaxis = list(title = "Week Number"),
+    yaxis = list(title = "Units")
+  )
+```
+
+## \## Code to skip ggplot entirely and show EXACTLY where reorder cases are.
+
+*NOTE* \*MAIN FUNCTION/VIS\*\*
+
+------------------------------------------------------------------------
+
+I did the cose below to simplify things by skipping ggplot entirely and
+using plot_ly() directly. That gives me full control over what’s shown
+in the tooltip vs. what’s actually plotted, to show reorder cases!
+
+```{r}
+
+item_data <- High_Volume_Weekly_DS %>% filter(ItemID == "18467") # <-- WHERE ITEM ID I enter!
+
+# Step 2: Get the reorder data (Weeks 16–53)
+reorder_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Qty"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Qty)
+
+# Step 3: Get the MSS data
+mss_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("MSS_Weeks_"),
+    names_to = "Window",
+    values_to = "MSS"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=MSS_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, MSS)
+
+# Step 4: Get weekly sales from Week16 to Week53
+sales_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Week"),
+    names_to = "Week",
+    values_to = "Sales"
+  ) %>%
+  mutate(Week_Num = as.numeric(str_remove(Week, "Week"))) %>%
+  filter(Week_Num >= 16, Week_Num <= 53) %>%
+  select(Week_Num, Sales) %>%
+  rename(Reorder_Week = Week_Num)
+
+# Step 5: Get the Reorder in Cases data
+reorder_cases_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Cases_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Cases"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Cases_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Cases)
+
+# -----------------------
+# Where the magic happens
+# -----------------------
+
+# Step 6: Prepare combined data with all metrics
+combined_plot_data_abs <- sales_long %>%
+  left_join(reorder_long, by = "Reorder_Week") %>%
+  left_join(mss_long, by = "Reorder_Week") %>%
+  left_join(reorder_cases_long, by = "Reorder_Week")
+
+# Step 7: Making the plotly object directly
+
+plot_ly() %>%
+  # Sales
+  add_trace(
+    data = combined_plot_data_abs,
+    x = ~Reorder_Week, y = ~Sales,
+    type = "scatter", mode = "lines+markers",
+    name = "Sales",
+    line = list(color = "black"),
+    marker = list(color = "black"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>Sales:", Sales)
+  ) %>%
+  # Reorder_Qty (with Reorder_Cases in tooltip)
+  add_trace(
+    data = combined_plot_data_abs,
+    x = ~Reorder_Week, y = ~Reorder_Qty,
+    type = "scatter", mode = "lines+markers",
+    name = "Reorder Quantity",
+    line = list(color = "blue"),
+    marker = list(color = "blue"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>Reorder Qty:", Reorder_Qty,
+                  "<br>Reorder Cases:", Reorder_Cases)
+  ) %>%
+  # MSS
+  add_trace(
+    data = combined_plot_data_abs,
+    x = ~Reorder_Week, y = ~MSS,
+    type = "scatter", mode = "lines+markers",
+    name = "MSS",
+    line = list(color = "red"),
+    marker = list(color = "red"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>MSS:", MSS)
+  ) %>%
+  layout(
+  title = "Sales vs Reorder Quantity vs MSS (Weeks 16–53)<br><sub>Item: SCOTTY'S VODKA 50ML (ItemID 18467)</sub>",
+  xaxis = list(
+    title = "Week Number",
+    tickmode = "linear",     # Linear spacing
+    tick0 = 16,              # Starting at week 16
+    dtick = 2                # Show every week (adjust to 2 or 5 if too crowded)
+  ),
+  yaxis = list(
+    title = "Value"         # Changing this based on data scale (e.g., 5, 10, 20, etc.)
+  ),
+  hovermode = "closest"
+)
+
+   # tickmode = "linear", # Changing this based on data scale
+   # tick0 = 0,           # Add the thing to the elft if needed for clearlification on y axis
+   # dtick = 50       
+```
+
+Yay! Now we can see reorder cases.
+
+As you can see, I used SCOTTY'S VODKA 50ML as an example. I will breifly
+explain what my visualizaiton above means.
+
+PRODUCT: SCOTTY’S VODKA 50ML (ItemID: 18467)
+
+Time Frame: Weeks 16–53
+
+Plotted: 
+- Sales (black line) 
+- MSS (Minimum Shelf Stock) (red line) 
+- Reorder Quantity (blue line, \~2× MSS)
+
+WHAT THE ALGORITHM IS DOING
+
+The Master Planning Algorithm estimates how much stock a store should
+always have (MSS) and how much to reorder (Reorder Quantity) based on
+past sales (especially PD1) and standard deviation (to avoid
+overreacting to weird spikes or drops). 
+- MSS = expected 10-day demand
+- Reorder Quantity = MSS + expected 10-day demand (so basically double of
+MSS for many items)
+
+This is a forecast-based inventory model. It’s assuming that recent high
+sales trends will continue unless the data shows strong variability (std
+dev \> 3).
+
+SALES PATTERN SUMMARY (in this case the Scotty's Vodka Example)
+
+Weeks 16–36 (High Sales Period)
+
+Sales regularly exceed MSS. Examples: - Week 18: Sales (172) \> MSS
+(147.43) - Week 30: Sales (203) \> MSS (182.48) - Week 36: Sales (255)
+\> MSS (224.95)
+
+What this means: The product is moving fast. - MSS is well-justified. -
+Reordering logic is working — it’s keeping up with demand. - No risking
+stockouts — maybe even underestimating demand slightly.
+
+BUT HERES WHEN THERE IS A PROBLEM...
+
+Weeks 42–53 (Sharp Sales Decline)
+
+Sales drop significantly below MSS. Examples: - Week 42: Sales \~150 vs
+MSS \~288 - Week 53: Sales 76 vs MSS 244.86
+
+What this means: 
+- The algorithm is still using high previous sales
+(like from PD1 or the Combined Average) to calculate MSS.
+- However, recent sales have sharply declined. 
+- The store is likely overstocked 
+
+The demand dropped but MSS and reorder quantities remained high.
+- The algorithm might not be reacting fast enough to recent drops — or PD1 was
+just so high that it’s still driving the numbers.
+
+WHY THIS HAPPENED
+
+The algorithm prioritizes past trends — especially PD1 (recent 5-week
+period) — but only switches to a combined average if sales variability
+is high.
+
+In this case: 
+- PD1 was likely very strong (weeks 31–35 or so) — so the MSS stayed high. 
+- Sales crashed starting Week 41, but the algorithm didn’t adjust quickly because: 
+- Standard deviation may not have triggered a switch to a lower average. 
+- There is no “cool down” logic in the base algorithm — it doesn’t account for sudden market changes or seasonality
+
+FINAL TAKEAWAY
+
+This visualization is good because it shows me when and where the
+algorithm assumptions break down: 
+- Early Weeks: Algorithm works well sales justify inventory levels. ️
+- Later Weeks: Sales drop, but the algorithm doesn’t adjust fast enough — leading to excess inventory.
+
+We may want to make MSS algorithm to adapt more quickly when recent
+sales drop significantly — perhaps by incorporating rolling averages,
+demand decay, or more dynamic STD thresholds.”
+
+```{r}
+
+item_data <- High_Volume_Weekly_DS %>% filter(ItemID == "42838") # <-- WHERE ITEM ID I enter!
+
+# Step 2: Get the reorder data (Weeks 16–53)
+reorder_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Qty"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Qty)
+
+# Step 3: Get the MSS data
+mss_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("MSS_Weeks_"),
+    names_to = "Window",
+    values_to = "MSS"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=MSS_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, MSS)
+
+# Step 4: Get weekly sales from Week16 to Week53
+sales_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Week"),
+    names_to = "Week",
+    values_to = "Sales"
+  ) %>%
+  mutate(Week_Num = as.numeric(str_remove(Week, "Week"))) %>%
+  filter(Week_Num >= 16, Week_Num <= 53) %>%
+  select(Week_Num, Sales) %>%
+  rename(Reorder_Week = Week_Num)
+
+# Step 5: Get the Reorder in Cases data
+reorder_cases_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Cases_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Cases"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Cases_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Cases)
+
+# -----------------------
+# Where the magic happens
+# -----------------------
+
+# Step 6: Prepare combined data with all metrics
+combined_plot_data_abs <- sales_long %>%
+  left_join(reorder_long, by = "Reorder_Week") %>%
+  left_join(mss_long, by = "Reorder_Week") %>%
+  left_join(reorder_cases_long, by = "Reorder_Week")
+
+# Step 7: Making the plotly object directly
+
+plot_ly() %>%
+  # Sales
+  add_trace(
+    data = combined_plot_data_abs,
+    x = ~Reorder_Week, y = ~Sales,
+    type = "scatter", mode = "lines+markers",
+    name = "Sales",
+    line = list(color = "black"),
+    marker = list(color = "black"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>Sales:", Sales)
+  ) %>%
+  # Reorder_Qty (with Reorder_Cases in tooltip)
+  add_trace(
+    data = combined_plot_data_abs,
+    x = ~Reorder_Week, y = ~Reorder_Qty,
+    type = "scatter", mode = "lines+markers",
+    name = "Reorder Quantity",
+    line = list(color = "blue"),
+    marker = list(color = "blue"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>Reorder Qty:", Reorder_Qty,
+                  "<br>Reorder Cases:", Reorder_Cases)
+  ) %>%
+  # MSS
+  add_trace(
+    data = combined_plot_data_abs,
+    x = ~Reorder_Week, y = ~MSS,
+    type = "scatter", mode = "lines+markers",
+    name = "MSS",
+    line = list(color = "red"),
+    marker = list(color = "red"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>MSS:", MSS)
+  ) %>%
+  layout(
+  title = "Sales vs Reorder Quantity vs MSS (Weeks 16–53)<br><sub>Item: DISARONNO AMARETTO - 750ML (ItemID 42838)</sub>",
+  xaxis = list(
+    title = "Week Number",
+    tickmode = "linear",     # Linear spacing
+    tick0 = 16,              # Starting at week 16
+    dtick = 2                # Show every week (adjust to 2 or 5 if too crowded)
+  ),
+  yaxis = list(
+    title = "Value"         # Changing this based on data scale
+  ),
+  hovermode = "closest"
+)
+
+   # tickmode = "linear", # Changing this based on data scale
+   # tick0 = 0,           # Add the thing to the elft if needed for clearlification on y axis
+   # dtick = 50      
+```
+
+```{r}
+# Get info of itemID 42838 from high volume data set
+High_Volume_Weekly_DS %>% filter(ItemID == "42838") %>% select(everything())
+```
+
+WHAT’S HAPPENING WITH DISARONNO AMARETTO - 750ML?
+
+Sales are up and down, not totally stable. Sales start low (Week 16: 4
+bottles = \~1 case), then:
+
+Spike randomly (e.g., Weeks 20, 21, 27) Dip sharply (Weeks 32–38: sales
+are very low) Climb strongly from Week 45 to 52 (up to 27 bottles in
+Week 52 — more than 2 full cases)
+
+HOW TO INTERPRET THE BEHAVIOR: Weeks 16–21 - Sales are sometimes below
+the MSS (red line), meaning inventory probably remained stable. The
+algorithm doesn’t change MSS much here — it’s around 12–15, assuming
+recent sales stay modest. Interpretation: Demand is low to medium. No
+urgent changes needed yet.
+
+Weeks 32–38: Drop in Sales - Sales stay well below MSS (sales as low as
+2–4 bottles while MSS is still \~7–9). This is an example where the
+algorithm is slow to respond.
+
+Result: holding more inventory than needed. The algorithm uses older
+sales in its averages (like 5-week blocks), so it takes a while to
+recognize a drop in demand.
+
+POSSIBLE SOLUTIONS: This is a good time to suggest weighted averages or
+demand decay to speed up reaction.
+
+Also: Weeks 45–52: Sales Explode Weekly sales go above the red line
+almost every week. MSS is too low, and even the reorder quantity (blue
+line) gets touched or exceeded. Week 52: Sales = 27 bottles (over 2
+cases). MSS = \~15.4. Reorder Quantity = \~30.8
+
+The store is likely running close to stockouts.
+
+HAT THIS ALL MEANS: DISARONNO sales start slow, then fluctuate. Around
+mid-year, sales dip hard, but the algorithm doesn’t react fast enough —
+we keep too much stock. Later in the year, demand shoots up fast. The
+algorithm starts raising the reorder amounts and MSS, but it’s still a
+bit slow, so sales go over those thresholds. This means we risk running
+out. The algorithm works okay, but it reacts slowly to change — it needs
+better sensitivity to recent trends.
+
+# Next step
+
+ROBLEM RECAP: - Sales drop fast (weeks 42–53) \| MSS and reorder
+quantities stay high. - Sales spike in certain weeks (weeks 42 - 52) \|
+System doesn’t respond fast enough.
+
+GOAL: Making algorithm adapt quickly to changing sales trends! MSS and
+Sales closely align, but 
+- MSS should be slightly above Sales (safety buffer). 
+- MSS should not lag behind if Sales are increasing quickly. 
+- MSS should drop fast when Sales go down (to prevent overstocking).
+
+FIRST IDEA: Weight Averages! Giving MORE IMPORTANCE to Recent Trends My
+current algorithm treats each 5-week period equally. That’s simple and
+fair, but not responsive to recent demand. A weighted average solves
+this. It gives more importance to recent trends, which is key for
+products like DISARONNO AMARETTO - 750ML, where demand changed
+significantly from week 45 onward.
+
+SECOND IDEA: 10-week, 15-week, 20-week Windows! This is about
+responsiveness vs stability: (All depends on the product variability of
+sales and patterns!)
+
+How to Choose: Volatile product? Use shorter window (10 weeks). Stable
+product? Use longer window (20 weeks).
+
+I will have to figure out how I will get volatily with my function, as I
+go along. I will first focus on the first idea.
+
+# Functions
+
+### WEIGHTED AVERAGES
+
+I will create a function below to calculate the weighted average for the
+last 5 weeks, 10 weeks, and 15 weeks. I will then use this function to
+calculate the reorder quantities and MSS.
+
+```{r}
+calculate_reorder_sliding_weighted <- function(row, start_week) {
+  
+  week_nums <- start_week:(start_week + 14)
+  
+  period1 <- as.numeric(row[paste0("Week", week_nums[1:5])])
+  period2 <- as.numeric(row[paste0("Week", week_nums[6:10])])
+  period3 <- as.numeric(row[paste0("Week", week_nums[11:15])])
+  
+  total_sales <- sum(period1) + sum(period2) + sum(period3)
+  if (total_sales < as.numeric(row["Bottles_Per_Case"])) return(0)
+
+  # Period averages
+  avg1 <- mean(period1)
+  avg2 <- mean(period2)
+  avg3 <- mean(period3)
+  
+  # Combined average with weights (Importance to get weighted average!) 
+  combined_avg <- (0.2 * avg1) + (0.3 * avg2) + (0.5 * avg3) 
+  stdev_val <- abs(avg1 - combined_avg)
+  
+  chosen_avg <- if (stdev_val > 3) combined_avg else avg1
+  daily_avg <- chosen_avg / 7
+
+  reorder_threshold_days <- if (row["Category"] == "Beer") 14 else 10
+  lead_time_days <- 10
+
+  MSS <- daily_avg * reorder_threshold_days
+  reorder_qty <- (daily_avg * lead_time_days) + MSS
+
+  return(round(reorder_qty, 2))
+}
+```
+
+### Function to calculate MSS
+
+This mirrors my original calculate_mss_sliding() but uses the weighted
+averages like the new reorder function I made:
+
+```{r}
+calculate_mss_sliding_weighted <- function(row, start_week) {
+  
+  week_nums <- start_week:(start_week + 14)
+  
+  period1 <- as.numeric(row[paste0("Week", week_nums[1:5])])
+  period2 <- as.numeric(row[paste0("Week", week_nums[6:10])])
+  period3 <- as.numeric(row[paste0("Week", week_nums[11:15])])
+  
+  total_sales <- sum(period1) + sum(period2) + sum(period3)
+  if (total_sales < as.numeric(row["Bottles_Per_Case"])) return(0)
+  
+  avg1 <- mean(period1)
+  avg2 <- mean(period2)
+  avg3 <- mean(period3)
+  
+  combined_avg <- (0.2 * avg1) + (0.3 * avg2) + (0.5 * avg3)
+  stdev_val <- abs(avg1 - combined_avg)
+  
+  chosen_avg <- if (stdev_val > 3) combined_avg else avg1
+  daily_avg <- chosen_avg / 7
+  
+  reorder_threshold_days <- if (row["Category"] == "Beer") 14 else 10
+  MSS <- daily_avg * reorder_threshold_days
+  
+  return(round(MSS, 2))
+}
+```
+
+### Function to calculate reorder cases for WEIGHTED reorder columns
+
+```{r}
+convert_weighted_reorder_to_cases <- function(dataset) {
+  for (start_week in 1:39) {
+    reorder_col <- paste0("Reorder_Weighted_Weeks_", start_week, "_", start_week + 14)
+    case_col <- paste0("Reorder_Cases_Weighted_Weeks_", start_week, "_", start_week + 14)
+    
+    # Ensure the reorder column exists before calculation
+    if (reorder_col %in% names(dataset)) {
+      dataset[[case_col]] <- ceiling(dataset[[reorder_col]] / as.numeric(dataset$Bottles_Per_Case))
+    }
+  }
+  return(dataset)
+}
+```
+
+WILL USE THE SAME LOGIC AS THE ORIGINAL MSS FUNCTION, BUT WITH WEIGHTED
+AVERAGES.
+
+# Applying Functions
+
+Here I will loop through weeks 1 to 39 again, but this time using the
+new function to calculate the reorder quantities and MSS.
+
+### Applying weighted reorder logic to copied datasets
+
+```{r}
+for (start_week in 1:39) {  
+  reorder_col_name <- paste0("Reorder_Weighted_Weeks_", start_week, "_", start_week + 14)
+  
+  High_Volume_Weekly_DS_weighted_averages[[reorder_col_name]] <- apply(High_Volume_Weekly_DS_weighted_averages, 1, function(row) {
+    calculate_reorder_sliding_weighted(row, start_week)
+  })
+  
+  Medium_Volume_Weekly_DS_weighted_averages[[reorder_col_name]] <- apply(Medium_Volume_Weekly_DS_weighted_averages, 1, function(row) {
+    calculate_reorder_sliding_weighted(row, start_week)
+  })
+  
+  Low_Volume_Weekly_DS_weighted_averages[[reorder_col_name]] <- apply(Low_Volume_Weekly_DS_weighted_averages, 1, function(row) {
+    calculate_reorder_sliding_weighted(row, start_week)
+  })
+}
+```
+
+### Applying weighted MSS logic to copied datasets
+
+```{r}
+for (start_week in 1:39) {  
+  mss_col_name <- paste0("MSS_Weighted_Weeks_", start_week, "_", start_week + 14)
+  
+  High_Volume_Weekly_DS_weighted_averages[[mss_col_name]] <- apply(High_Volume_Weekly_DS_weighted_averages, 1, function(row) {
+    calculate_mss_sliding_weighted(row, start_week)
+  })
+  
+  Medium_Volume_Weekly_DS_weighted_averages[[mss_col_name]] <- apply(Medium_Volume_Weekly_DS_weighted_averages, 1, function(row) {
+    calculate_mss_sliding_weighted(row, start_week)
+  })
+  
+  Low_Volume_Weekly_DS_weighted_averages[[mss_col_name]] <- apply(Low_Volume_Weekly_DS_weighted_averages, 1, function(row) {
+    calculate_mss_sliding_weighted(row, start_week)
+  })
+}
+```
+
+### Applying the conversion to cases
+
+```{r}
+High_Volume_Weekly_DS_weighted_averages <- convert_weighted_reorder_to_cases(High_Volume_Weekly_DS_weighted_averages)
+Medium_Volume_Weekly_DS_weighted_averages <- convert_weighted_reorder_to_cases(Medium_Volume_Weekly_DS_weighted_averages)
+Low_Volume_Weekly_DS_weighted_averages <- convert_weighted_reorder_to_cases(Low_Volume_Weekly_DS_weighted_averages)
+```
+
+### Visualizing the new weighted algorithm
+
+```{r}
+
+item_data <- High_Volume_Weekly_DS_weighted_averages %>% filter(ItemID == "18467")  # Adjust as needed
+
+# Reorder Quantity (Weighted)
+reorder_long_weighted <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Weighted_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Qty"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Weighted_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Qty)
+
+# MSS (Weighted)
+mss_long_weighted <- item_data %>%
+  pivot_longer(
+    cols = starts_with("MSS_Weighted_Weeks_"),
+    names_to = "Window",
+    values_to = "MSS"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=MSS_Weighted_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, MSS)
+
+# Sales
+sales_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Week"),
+    names_to = "Week",
+    values_to = "Sales"
+  ) %>%
+  mutate(Week_Num = as.numeric(str_remove(Week, "Week"))) %>%
+  filter(Week_Num >= 16, Week_Num <= 53) %>%
+  select(Week_Num, Sales) %>%
+  rename(Reorder_Week = Week_Num)
+
+# Reorder in Cases (Weighted)
+reorder_cases_long_weighted <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Cases_Weighted_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Cases"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Cases_Weighted_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Cases)
+
+# Combine for plotting
+combined_plot_data_weighted <- sales_long %>%
+  left_join(reorder_long_weighted, by = "Reorder_Week") %>%
+  left_join(mss_long_weighted, by = "Reorder_Week") %>%
+  left_join(reorder_cases_long_weighted, by = "Reorder_Week")
+
+# Create Plot
+plot_ly() %>%
+  # Sales
+  add_trace(
+    data = combined_plot_data_weighted,
+    x = ~Reorder_Week, y = ~Sales,
+    type = "scatter", mode = "lines+markers",
+    name = "Sales", line = list(color = "black"),
+    marker = list(color = "black"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week, "<br>Sales:", Sales)
+  ) %>%
+  # Reorder Qty
+  add_trace(
+    data = combined_plot_data_weighted,
+    x = ~Reorder_Week, y = ~Reorder_Qty,
+    type = "scatter", mode = "lines+markers",
+    name = "Reorder Quantity (W)",
+    line = list(color = "blue"),
+    marker = list(color = "blue"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>Reorder Qty:", Reorder_Qty,
+                  "<br>Reorder Cases:", Reorder_Cases)
+  ) %>%
+  # MSS
+  add_trace(
+    data = combined_plot_data_weighted,
+    x = ~Reorder_Week, y = ~MSS,
+    type = "scatter", mode = "lines+markers",
+    name = "MSS (W)",
+    line = list(color = "red"),
+    marker = list(color = "red"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week, "<br>MSS:", MSS)
+  ) %>%
+  layout(
+    title = "Weighted Reorder & MSS vs Sales (Weeks 16–53)<br><sub>Item: DISARONNO AMARETTO - 750ML (ItemID 42838)</sub>",
+    xaxis = list(title = "Week Number", tickmode = "linear", tick0 = 16, dtick = 2),
+    yaxis = list(title = "Value"),
+    hovermode = "closest"
+  )
+
+```
+
+I see results... okay results thus far.
+
+NOW...
+
+I will apply my OWN LOGIC to the MSS and Reorder Quantity calculations.
+
+**MY OFFICAL ALGOIRHTM** This will be a custom algorithm that I made
+based on logic and possible solutions for the project.
+
+```{r}
+calculate_reorder_my_way <- function(row, start_week) {
+  # Define full 15-week window
+  week_nums <- start_week:(start_week + 14)
+  week_labels <- paste0("Week", week_nums)
+
+  # Pull weekly sales
+  sales <- as.numeric(row[week_labels])
+
+  # Default periods (5-5-5)
+  p1 <- sales[1:5]
+  p2 <- sales[6:10]
+  p3 <- sales[11:15]
+
+  # Compute averages
+  avg1 <- mean(p1)
+  avg2 <- mean(p2)
+  avg3 <- mean(p3)
+
+  combined_avg <- mean(c(avg1, avg2, avg3))
+  stdev <- sd(c(avg1, avg2, avg3))
+  cv <- if (combined_avg > 0) stdev / combined_avg else 0
+
+  # Detect instability: high CV or trend reversal
+  unstable <- (cv > 0.25) || ((avg1 < avg2 & avg2 > avg3) | (avg1 > avg2 & avg2 < avg3))
+
+  # Re-define periods if unstable (5-4-3 instead of 5-5-5)
+  if (unstable) {
+    p1 <- sales[1:5]
+    p2 <- sales[6:9]
+    p3 <- sales[10:12]
+
+    avg1 <- mean(p1)
+    avg2 <- mean(p2)
+    avg3 <- mean(p3)
+
+    combined_avg <- mean(c(avg1, avg2, avg3))
+  }
+
+  # Weighted average (more weight on recent)
+  weighted_avg <- (avg1 * 0.2) + (avg2 * 0.3) + (avg3 * 0.5)
+
+  # If total sales < 1 case, don't reorder
+  total_sales <- sum(p1, p2, p3)
+  if (total_sales < as.numeric(row["Bottles_Per_Case"])) {
+    return(0)
+  }
+
+  # Choose base avg: fallback to combined if instability is extreme
+  chosen_avg <- if (unstable) weighted_avg else avg1
+  daily_avg <- chosen_avg / 7
+
+  # Reorder threshold (days) and lead time (days)
+  reorder_days <- if (row["Category"] == "Beer") 14 else 10
+  lead_time <- 10
+
+  # Minimum Shelf Stock and Reorder Quantity (in bottles)
+  MSS <- daily_avg * reorder_days
+  reorder_qty_bottles <- MSS + (daily_avg * lead_time)
+
+  return(round(reorder_qty_bottles, 2))
+}
+
+```
+
+### Function to calculate MSS
+
+```{r}
+calculate_mss_my_way <- function(row, start_week) {
+  # Define full 15-week window
+  week_nums <- start_week:(start_week + 14)
+  week_labels <- paste0("Week", week_nums)
+
+  # Pull weekly sales
+  sales <- as.numeric(row[week_labels])
+
+  # Default periods (5-5-5)
+  p1 <- sales[1:5]
+  p2 <- sales[6:10]
+  p3 <- sales[11:15]
+
+  # Compute averages
+  avg1 <- mean(p1)
+  avg2 <- mean(p2)
+  avg3 <- mean(p3)
+
+  combined_avg <- mean(c(avg1, avg2, avg3))
+  stdev <- sd(c(avg1, avg2, avg3))
+  cv <- if (combined_avg > 0) stdev / combined_avg else 0
+
+  # Detect instability
+  unstable <- (cv > 0.25) || ((avg1 < avg2 & avg2 > avg3) | (avg1 > avg2 & avg2 < avg3))
+
+  # Re-define periods if unstable (5-4-3)
+  if (unstable) {
+    p1 <- sales[1:5]
+    p2 <- sales[6:9]
+    p3 <- sales[10:12]
+
+    avg1 <- mean(p1)
+    avg2 <- mean(p2)
+    avg3 <- mean(p3)
+  }
+
+  # Weighted average if unstable, otherwise use avg1
+  chosen_avg <- if (unstable) (avg1 * 0.2 + avg2 * 0.3 + avg3 * 0.5) else avg1
+  daily_avg <- chosen_avg / 7
+
+  total_sales <- sum(p1, p2, p3)
+  if (total_sales < as.numeric(row["Bottles_Per_Case"])) {
+    return(0)  # No MSS if total sales < 1 case
+  }
+
+  reorder_days <- if (row["Category"] == "Beer") 14 else 10
+  MSS <- daily_avg * reorder_days
+
+  return(round(MSS, 2))
+}
+```
+
+### Function to convert reorder to cases
+
+```{r}
+convert_reorder_to_cases <- function(dataset) {
+  for (start_week in 1:39) {
+    reorder_col <- paste0("Reorder_Weeks_", start_week, "_", start_week + 14)
+    case_col <- paste0("Reorder_Cases_Weeks_", start_week, "_", start_week + 14)
+    
+    dataset[[case_col]] <- ceiling(dataset[[reorder_col]] / as.numeric(dataset$Bottles_Per_Case))
+  }
+  return(dataset)
+}
+
+```
+
+---
+# Applying Functions to data
+---
+
+```{r}
+# Apply my reorder function across sliding windows
+for (start_week in 1:39) {
+  reorder_col_name <- paste0("Reorder_Weeks_", start_week, "_", start_week + 14)
+
+  High_Volume_Weekly_DS_copy[[reorder_col_name]] <- apply(High_Volume_Weekly_DS_copy, 1, function(row) {
+    calculate_reorder_my_way(row, start_week)
+  })
+
+  Medium_Volume_Weekly_DS_copy[[reorder_col_name]] <- apply(Medium_Volume_Weekly_DS_copy, 1, function(row) {
+    calculate_reorder_my_way(row, start_week)
+  })
+
+  Low_Volume_Weekly_DS_copy[[reorder_col_name]] <- apply(Low_Volume_Weekly_DS_copy, 1, function(row) {
+    calculate_reorder_my_way(row, start_week)
+  })
+}
+```
+
+```{r}
+# Apply my MSS function across sliding windows
+for (start_week in 1:39) {
+  mss_col_name <- paste0("MSS_Weeks_", start_week, "_", start_week + 14)
+
+  High_Volume_Weekly_DS_copy[[mss_col_name]] <- apply(High_Volume_Weekly_DS_copy, 1, function(row) {
+    calculate_mss_my_way(row, start_week)
+  })
+
+  Medium_Volume_Weekly_DS_copy[[mss_col_name]] <- apply(Medium_Volume_Weekly_DS_copy, 1, function(row) {
+    calculate_mss_my_way(row, start_week)
+  })
+
+  Low_Volume_Weekly_DS_copy[[mss_col_name]] <- apply(Low_Volume_Weekly_DS_copy, 1, function(row) {
+    calculate_mss_my_way(row, start_week)
+  })
+}
+```
+
+```{r}
+# Convert reorder bottles to cases using dynamic outputs
+High_Volume_Weekly_DS_copy <- convert_reorder_to_cases(High_Volume_Weekly_DS_copy)
+Medium_Volume_Weekly_DS_copy <- convert_reorder_to_cases(Medium_Volume_Weekly_DS_copy)
+Low_Volume_Weekly_DS_copy <- convert_reorder_to_cases(Low_Volume_Weekly_DS_copy)
+```
+
+```{r}
+
+# Replace this with My dataset and target ItemID
+item_data <- High_Volume_Weekly_DS_copy %>% filter(ItemID == "42838")
+
+# Step 2: Get the reorder quantity (Weeks 16–53)
+reorder_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Qty"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Qty)
+
+# Step 3: Get the MSS data
+mss_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("MSS_Weeks_"),
+    names_to = "Window",
+    values_to = "MSS"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=MSS_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, MSS)
+
+# Step 4: Get weekly sales from Week16 to Week53
+sales_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Week"),
+    names_to = "Week",
+    values_to = "Sales"
+  ) %>%
+  mutate(Week_Num = as.numeric(str_remove(Week, "Week"))) %>%
+  filter(Week_Num >= 16, Week_Num <= 53) %>%
+  select(Week_Num, Sales) %>%
+  rename(Reorder_Week = Week_Num)
+
+# Step 5: Get the Reorder in Cases data
+reorder_cases_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Cases_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Cases"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Cases_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Cases)
+
+# Step 6: Combine all data
+combined_plot_data_mine <- sales_long %>%
+  left_join(reorder_long, by = "Reorder_Week") %>%
+  left_join(mss_long, by = "Reorder_Week") %>%
+  left_join(reorder_cases_long, by = "Reorder_Week")
+
+# Step 7: Plot
+plot_ly() %>%
+  add_trace(
+    data = combined_plot_data_mine,
+    x = ~Reorder_Week, y = ~Sales,
+    type = "scatter", mode = "lines+markers",
+    name = "Sales",
+    line = list(color = "black"),
+    marker = list(color = "black"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>Sales:", Sales)
+  ) %>%
+  add_trace(
+    data = combined_plot_data_mine,
+    x = ~Reorder_Week, y = ~Reorder_Qty,
+    type = "scatter", mode = "lines+markers",
+    name = "Reorder Quantity",
+    line = list(color = "blue"),
+    marker = list(color = "blue"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>Reorder Qty:", Reorder_Qty,
+                  "<br>Reorder Cases:", Reorder_Cases)
+  ) %>%
+  add_trace(
+    data = combined_plot_data_mine,
+    x = ~Reorder_Week, y = ~MSS,
+    type = "scatter", mode = "lines+markers",
+    name = "MSS",
+    line = list(color = "red"),
+    marker = list(color = "red"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>MSS:", MSS)
+  ) %>%
+  layout(
+    title = "Sales vs Reorder Quantity vs MSS (Weeks 16–53)<br><sub>Item: DISARONNO AMARETTO - 750MLL (ItemID 42838)</sub>",
+    xaxis = list(
+      title = "Week Number",
+      tickmode = "linear",
+      tick0 = 16,
+      dtick = 2
+    ),
+    yaxis = list(title = "Value"),
+    hovermode = "closest"
+  )
+```
+
+```{r}
+
+# Replace this with My dataset and target ItemID
+item_data <- High_Volume_Weekly_DS_copy %>% filter(ItemID == "18467")
+
+# Step 2: Get the reorder quantity (Weeks 16–53)
+reorder_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Qty"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Qty)
+
+# Step 3: Get the MSS data
+mss_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("MSS_Weeks_"),
+    names_to = "Window",
+    values_to = "MSS"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=MSS_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, MSS)
+
+# Step 4: Get weekly sales from Week16 to Week53
+sales_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Week"),
+    names_to = "Week",
+    values_to = "Sales"
+  ) %>%
+  mutate(Week_Num = as.numeric(str_remove(Week, "Week"))) %>%
+  filter(Week_Num >= 16, Week_Num <= 53) %>%
+  select(Week_Num, Sales) %>%
+  rename(Reorder_Week = Week_Num)
+
+# Step 5: Get the Reorder in Cases data
+reorder_cases_long <- item_data %>%
+  pivot_longer(
+    cols = starts_with("Reorder_Cases_Weeks_"),
+    names_to = "Window",
+    values_to = "Reorder_Cases"
+  ) %>%
+  mutate(
+    Start_Week = as.numeric(str_extract(Window, "(?<=Reorder_Cases_Weeks_)\\d+")),
+    Reorder_Week = Start_Week + 15
+  ) %>%
+  select(Reorder_Week, Reorder_Cases)
+
+# Step 6: Combine all data
+combined_plot_data_mine <- sales_long %>%
+  left_join(reorder_long, by = "Reorder_Week") %>%
+  left_join(mss_long, by = "Reorder_Week") %>%
+  left_join(reorder_cases_long, by = "Reorder_Week")
+
+# Step 7: Plot
+plot_ly() %>%
+  add_trace(
+    data = combined_plot_data_mine,
+    x = ~Reorder_Week, y = ~Sales,
+    type = "scatter", mode = "lines+markers",
+    name = "Sales",
+    line = list(color = "black"),
+    marker = list(color = "black"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>Sales:", Sales)
+  ) %>%
+  add_trace(
+    data = combined_plot_data_mine,
+    x = ~Reorder_Week, y = ~Reorder_Qty,
+    type = "scatter", mode = "lines+markers",
+    name = "Reorder Quantity",
+    line = list(color = "blue"),
+    marker = list(color = "blue"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>Reorder Qty:", Reorder_Qty,
+                  "<br>Reorder Cases:", Reorder_Cases)
+  ) %>%
+  add_trace(
+    data = combined_plot_data_mine,
+    x = ~Reorder_Week, y = ~MSS,
+    type = "scatter", mode = "lines+markers",
+    name = "MSS",
+    line = list(color = "red"),
+    marker = list(color = "red"),
+    hoverinfo = "text",
+    text = ~paste("Week:", Reorder_Week,
+                  "<br>MSS:", MSS)
+  ) %>%
+  layout(
+    title = "Sales vs Reorder Quantity vs MSS (Weeks 16–53)<br><sub>Item: SCOTTY'S VODKA 50ML (ItemID 18467)</sub>",
+    xaxis = list(
+      title = "Week Number",
+      tickmode = "linear",
+      tick0 = 16,
+      dtick = 2
+    ),
+    yaxis = list(title = "Value"),
+    hovermode = "closest"
+  )
+```
+
+------------------------------------------------------------------------
+
+# Comparing Algorithms
+
+Okay! So now that I have this, I want to statistically compare both
+algorithms.
+
+Comparing reorder quantity to actual sales, this could be a better
+statistical strategy to compare how well the Minimum Shelf Stock (MSS)
+and Reorder Quantity work relative to sales patterns — particularly in
+preventing:
+
+Stockouts (sales MSS -\> risk of not having enough on shelf)
+Overstocking (MSS or reorder is way higher than needed for normal
+fluctuations)
+
+#### Stockouts
+
+How often does sales exceed MSS? (risk of stockout)
+
+```{r}
+#MINE
+stockout_risk_your <- sum(combined_plot_data_mine$Sales > combined_plot_data_mine$MSS) / nrow(combined_plot_data_mine)
+cat("Stockout Risk - My Algorithm:", round(stockout_risk_your * 100, 2), "%\n")
+
+#ABS
+stockout_risk_abs <- sum(combined_plot_data_abs$Sales > combined_plot_data_abs$MSS) / nrow(combined_plot_data_abs)
+cat("Stockout Risk - ABS Algorithm:", round(stockout_risk_abs * 100, 2), "%\n")
+
+#WEIGHTED DATA (This may be use for my presentation)
+stockout_risk_weighted <- sum(combined_plot_data_weighted$Sales > combined_plot_data_weighted$MSS) / nrow(combined_plot_data_weighted)
+cat("Stockout Risk - Weighted Algorithm:", round(stockout_risk_weighted * 100, 2), "%\n")
+
+```
+
+```{r}
+# Binary 1 = stockout risk, 0 = safe
+risk_flag_your <- as.integer(combined_plot_data_mine$Sales > combined_plot_data_mine$MSS)
+risk_flag_abs <- as.integer(combined_plot_data_abs$Sales > combined_plot_data_abs$MSS)
+risk_flag_weighted <- as.integer(combined_plot_data_weighted$Sales > combined_plot_data_weighted$MSS)
+
+# McNemar's test for paired binary outcomes
+mcnemar.test(table(risk_flag_abs, risk_flag_your))
+mcnemar.test(table(risk_flag_weighted, risk_flag_abs))
+mcnemar.test(table(risk_flag_weighted, risk_flag_your))
+
+```
+
+FOR NOTE:
+
+What I tested:
+
+I used McNemar’s test, which can help compare two algorithms when their results are binary (1 = stockout risk, 0 = safe) on the same cases (same weeks).
+
+Does my algorithm and the ABS algorithm disagree in a meaningful, non-random way about stockout risks?
+
+
+McNemar’s Test Results
+
+1. Scotty’s Vodka – 50mL
+	-	Chi-squared = 0.8
+	-	p-value = 0.3711
+
+2. Disaronno Amaretto – 750mL
+	-	Chi-squared = 1.33
+	-	p-value = 0.2482
+
+
+What That Means:
+
+P-values > 0.05 mean:
+	-	There is no statistically significant difference in how the two algorithms label stockout risk.
+	-	Your algorithm and ABS agree most of the time on whether a stockout is likely or not.
+	-	Any differences you’re seeing are likely due to random chance, not systematic differences.
+
+In context:
+	-	For both Scotty’s and Disaronno, the custom algorithm’s stockout predictions don’t differ much from ABS’s.
+	-	That’s not actually a bad thing tho — it could mean my algorithm does a good job mimicking OR improving the method while keeping risk patterns a bit similar.
+
+
+NOW I NEED TO LOOK AT...
+	- where they disagree. Even if overall they match, maybe there are specific weeks or sales spikes where your algorithm is better at flagging risk.
+	- excess stock metric
+	-	Fit quality breakdown (“Too Low” / “Too High” / “Good Fit”)
+	-	Volatility comparison
+
+
+#### Overstock Metric: Average Excess Inventory
+
+This tells me if the algorithm is overstocking relative to sales — (how
+much higher MSS is than actual sales each week.)
+
+```{r}
+#MINE
+excess_stock_your <- mean(pmax(combined_plot_data_mine$MSS - combined_plot_data_mine$Sales, 0))
+cat("Avg Excess Stock - My Algorithm:", round(excess_stock_your, 2), "\n")
+
+#ABS
+excess_stock_abs <- mean(pmax(combined_plot_data_abs$MSS - combined_plot_data_abs$Sales, 0))
+cat("Avg Excess Stock - ABS Algorithm:", round(excess_stock_abs, 2), "\n")
+
+#WEIGHTED DATA (This may be use for my presentation)
+excess_stock_weighted <- mean(pmax(combined_plot_data_weighted$MSS - combined_plot_data_weighted$Sales, 0))
+cat("Avg Excess Stock - Weighted Algorithm:", round(excess_stock_weighted, 2), "\n")
+
+```
+
+#### Reorder Quantity Volatility
+
+This measures how much reorder quantities bounce around week to week.
+Lower is more stable and predictable (which store managers like).
+
+```{r}
+#MINE
+reorder_volatility_your <- sd(combined_plot_data_mine$Reorder_Qty, na.rm = TRUE)
+cat("Reorder Qty Volatility - My Algorithm:", round(reorder_volatility_your, 2), "\n")
+
+#ABS
+reorder_volatility_abs <- sd(combined_plot_data_abs$Reorder_Qty, na.rm = TRUE)
+cat("Reorder Qty Volatility - ABS Algorithm:", round(reorder_volatility_abs, 2), "\n")
+
+reorder_volatility_weighted <- sd(combined_plot_data_weighted$Reorder_Qty, na.rm = TRUE)
+cat("Reorder Qty Volatility - Weighted Algorithm:", round(reorder_volatility_weighted, 2), "\n")
+
+```
+
+```{r}
+evaluate_fit <- function(sales, mss) {
+  diff_ratio <- (sales - mss) / ifelse(mss == 0, 1, mss) # prevent division by zero. This calculates the percentage difference between Sales and MSS.
+
+#	If sales are way higher than MSS -> risk stockouts -> “Too Low”
+#	If MSS is way higher than sales -> wasting shelf space -> “Too High”
+#	If MSS is pretty close to sales -> balancing well -> “Good Fit”
+
+  
+  case_when(
+    diff_ratio > 0.10 ~ "Too Low", # Sales are >10% above MSS (bad! MSS is too low)
+    diff_ratio < -0.10 ~ "Too High", # Sales are >10% below MSS (bad! MSS is too high)
+    TRUE ~ "Good Fit" # MSS is close enough to sales (within + or - 10%)
+  )
+}
+
+#Why Use 0.10 (10%) As the Cutoff?
+
+#That 0.10 is a tolerance window. It means:
+#	If MSS is within + or - 10% of actual sales -> it’s considered a “Good Fit”
+#	More than +10% -> you’re probably overstocking
+#	More than −10% -> you’re understocking (risking a stockout)
+
+# 10% is just a reasonable default. You can change it if you want tighter or looser definition
+
+# Apply to both datasets
+combined_plot_data_mine$fit_category <- evaluate_fit(combined_plot_data_mine$Sales, combined_plot_data_mine$MSS)
+combined_plot_data_abs$fit_category <- evaluate_fit(combined_plot_data_abs$Sales, combined_plot_data_abs$MSS)
+combined_plot_data_weighted$fit_category <- evaluate_fit(combined_plot_data_weighted$Sales, combined_plot_data_weighted$MSS)
+
+# Count proportions
+table_mine <- prop.table(table(combined_plot_data_mine$fit_category))
+table_abs <- prop.table(table(combined_plot_data_abs$fit_category))
+table_weighted <- prop.table(table(combined_plot_data_weighted$fit_category))
+
+cat("\nFit Breakdown - My Algorithm:"); print(round(table_mine * 100, 1))
+cat("\nFit Breakdown - ABS Algorithm:"); print(round(table_abs * 100, 1))
+cat("\nFit Breakdown - Weighted Algorithm:"); print(round(table_weighted * 100, 1))
+
+```
+
+| Metric                 | What It Tells You                      |
+|------------------------|----------------------------------------|
+| **Stockout Risk**      | If I am understocking                  |
+| **Avg Excess Stock**   | If I am overstocking                   |
+| **Reorder Volatility** | If I am ordering is stable or noisy    |
+| **Balance Score**      | How well MSS aligns with actual demand |
+
+------------------------------------------------------------------------
+
+# Metrics recieved for Scottys Vodka (item 18467) and Disaronno Amaretto (item 42838)
+
+Scottys Vodka:
+
+| **Metric** | **My Algorithm** | **ABS Algorithm** | **I n terpretation** |
+|------------------|------------------|------------------|------------------|
+| **Stockout Risk** | 21.05% | **13.16%** | My algorithm is **more prone to u n derstocking**, which can lead to stockouts |
+| **Avg Excess Stock** | **55.62** | 60.45 | I am slightly **more efficient**, with less excess inventory |
+| **Reorder Volatility** | 120.94 | **111.13** | My reorder amounts are a bit **more erratic** than ABS’s |
+| **Balance Score** | 18.4% Good Fit | 18.4% Good Fit | Tie — both hit the same % of weeks where MSS matched demand well |
+|  | 18.4% Too Low | **10.5% Too Low** | ABS is **less likely** to understock (better safety margin) |
+|  | **63.2% Too High** | 71.1% Too High | My model **overstocks slightly less** than ABS |
+
+What This Suggests:
+
+Strengths (My algorithm)
+- hold less excess inventory, which is good for
+saving space and money. 
+- slightly reduce overstocking compared to ABS.
+- achieve the same % of Good Fits as ABS.
+
+Weaknesses of my Algorithm
+- Higher stockout risk (21% vs. 13%) is a major concern — especially for high-demand items. 
+- More week-to-week variability in reorder quantity might frustrate managers or disrupt
+logistics. 
+- More “Too Low” weeks than ABS — meaning you’re sometimes
+not covering demand spikes.
+
+What McNemar’s Test Tells Us
+
+The McNemar test (p = 0.37) shows that the difference in stockout risks
+between the algorithms isn’t statistically significant — at least not
+with my my data sample. But the practical impact of stockouts might
+still be important, depending on the product type.
+
+---
+
+Disaronno Amaretto:
+
+| **Metric** | **My Algorithm** | **ABS Algorithm** | **Interpretation** |
+|------------------|------------------|------------------|------------------|
+| **Stockout Risk** | 36.84% | 28.95% | My algorithm is more aggressive, leading to higher risk of stockouts. |
+| **Avg Excess Stock** | 2.77 | 3.68 | I am holding less unnecessary inventory — more efficient shelf usage. |
+| **Reorder Volatility** | 3.65 | 5.62 | My orders are **more stable**, easier for store staff to manage. |
+| **MSS Fit – Good Fit %** | 10.5% | 5.3% | I have a **slightly better balance**, but both struggle to match MSS to sales closely. |
+| **MSS Too High %** | 60.5% | 65.8% | I am overstocking **slightly less** than ABS. |
+| **MSS Too Low %** | 28.9% | 28.9% | Equal understock risk — which aligns with the identical “Too Low” fit breakdown. |
+
+Interpretation & Takeaways
+
+1\. My algorithm reduces overstocking more effectively, as seen in both
+lower Excess Stock and fewer Too High MSS weeks.
+
+2\. However, the cost of that efficiency is higher stock out risk — my
+algorithm crosses the 35% mark, which is pretty high. It might be too
+aggressive in cutting safety stock for this product.
+
+3\. Stability is a win — My Reorder Volatility is much lower, which
+helps operational consistency.
+
+4\. Neither algorithm fits perfectly, but Mys edges out in the “Good
+Fit” category. That said, both still leave room for improvement in MSS
+tuning for this product.
+
+
+Project Conclusion
+-	This project explored two algorithms — the ABS baseline and my customized model — to optimize Minimum Shelf Stock (MSS) and Reorder Quantities for alcohol inventory across different store types.
+-	I focused on balancing stock availability vs. inventory efficiency, using real 2024 sales data and evaluating weekly performance.
+-	 My algorithm aimed to reduce overstocking and excess inventory, and it succeeded in doing so across products like Scotty’s Vodka and Disaronno Amaretto. But it did at times have it's points of over stocking, when we reach certain weeks as we discussed above.
+-	 However, this came at the cost of higher stockout risk, especially for fast-moving products — highlighting the tradeoff between aggressiveness and safety stock.
+-	 Key metrics like Excess Stock, Reorder Volatility, Fit Quality, and McNemar’s Test were used to compare both models fairly.
+-	 While neither algorithm is perfect, my version offers an efficient, customizable alternative that can be fine-tuned by product type or store profile, because it can definitely be considered when looking at over sold products as we seen with Disaronno Amaretto.
+-	Next Steps could include testing hybrid thresholds, adding external factors like promotions, and automating MSS updates for real-time responsiveness.
+	
+In conclusion, this project tried to create an inventory algorithm that could improve ABS Stores' reorder quantities and MSS, and the results showed potential in some areas while other areas could lack. Comparing the original ABS model with my approach, I highlighted some places with improvement to manage stockouts and stabilize reorder patterns on specific time periods of the weeks, but there are some differences in terms of its responsiveness with different products. I wish to have the next time use more sets of products that are similar in sale patterns and test to see how the algorithm would respond, but that would take extremely long to process all 500 products per each store. I also would suggest refining the performance of the algorithm with more instability measures to target adjustments on certain weeks to create a more adaptable system for ABS retail stores.
+
+
